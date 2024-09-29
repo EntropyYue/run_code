@@ -2,9 +2,11 @@ import os
 import typing
 import requests
 import json
+import asyncio
 from pydantic import BaseModel, Field
 
 
+# 事件发射器处理
 class EventEmitter:
     def __init__(self, event_emitter: typing.Callable[[dict], typing.Any] = None):
         self.event_emitter = event_emitter
@@ -32,16 +34,23 @@ class EventEmitter:
             }
         )
 
+# <test>
+
+# 事件发射器
+async def __event_emitter__(__emitter__: dict):
+    pass
+
+# </test>
 
 def get_end_output(response: requests.Response):
 
     output = response.json()["result"][0]["cells"][-1]["outputs"]
 
     if output == []:
-        return "not output."
+        return {"status": "", "output": "not output."}
 
     if response.status_code == 200:
-        return output[0]["text"]
+        return {"status": "", "output": output[0]["text"]}
 
 
 class Tools:
@@ -64,9 +73,9 @@ class Tools:
         """
         在Jupyter Notebook中运行Python代码
 
-        :param code: 要运行的Python代码，代码将在一个有状态的ipython环境中运行
+        :params code: 要运行的Python代码，代码将在一个有状态的ipython环境中运行
 
-        :return: 一个包含以下字段的json对象：`input`, `output`
+        :return: 一个包含以下字段的json对象：`代码输入`, `在Jupyter Notebook中执行的返回`
         """
         emitter = EventEmitter(__event_emitter__)
         await emitter.emit("正在执行代码")
@@ -105,3 +114,19 @@ class Tools:
             )
 
             return "代码执行出现错误"
+
+
+async def main():
+    tools = Tools()
+    print(
+        await tools.run_code(
+            """
+            print('hello world')
+            """,
+            __event_emitter__
+        )
+    )
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
