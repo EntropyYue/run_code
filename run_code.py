@@ -34,6 +34,18 @@ class EventEmitter:
             }
         )
 
+    async def citation(self, document, source = {"name": "run_code"}):
+        await self.event_emitter(
+            {
+                "type": "citation",
+                "data": {
+                    "document": document,
+                    "metadata": document,
+                    "source": source,
+                },
+            }
+        )
+
 # <test>
 
 # 事件发射器
@@ -41,17 +53,6 @@ async def __event_emitter__(__emitter__: dict):
     pass
 
 # </test>
-
-def get_end_output(response: requests.Response):
-
-    output = response.json()["result"][0]["cells"][-1]["outputs"]
-
-    if output == []:
-        return {"status": "", "output": "not output."}
-
-    if response.status_code == 200:
-        return {"status": "", "output": output[0]["text"]}
-
 
 class Tools:
     class Valves(BaseModel):
@@ -71,9 +72,9 @@ class Tools:
         __event_emitter__: typing.Callable[[dict], typing.Any] = None
     ) -> str:
         """
-        在Jupyter Notebook中运行Python代码
+        在Jupyter Notebook中运行iPython代码，使用"% "开头的代码来执行系统命令，例如：% ls
 
-        :params code: 要运行的Python代码，代码将在一个有状态的ipython环境中运行
+        :params code: 要运行的iPython代码，代码将在一个有状态的ipython环境中运行
 
         :return: 一个包含以下字段的json对象：`代码输入`, `在Jupyter Notebook中执行的返回`
         """
@@ -95,25 +96,22 @@ class Tools:
                 done=True,
             )
 
-            await emitter.message(
-                f"在Jupyter Notebook中执行了\n```python\n{code}\n```\n返回的结果是\n```返回\n{get_end_output(self.response)}\n```\n"
-            )
-
-            return json.dumps(
-                {
-                    "代码输入": code,
-                    "在Jupyter Notebook中执行的返回": get_end_output(self.response),
-                },
-                ensure_ascii=False,
-            )
         else:
             await emitter.emit(
                 status="error",
-                description="代码执行出现错误",
-                done=True
+                description=f"代码执行失败",
+                done=True,
             )
 
-            return "代码执行出现错误"
+            await emitter.citation([code])
+
+        return json.dumps(
+            {
+                "注释": "以下是你在Jupyter Notebook中执行的所有代码的输入和输出组成的json，最后一个字典是你执行的上一段代码",
+                "exec": self.response.json(),
+            },
+                ensure_ascii=False,
+            )
 
 
 async def main():
@@ -121,7 +119,7 @@ async def main():
     print(
         await tools.run_code(
             """
-            print('hello world')
+            print("Hello, World!")
             """,
             __event_emitter__
         )
